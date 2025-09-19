@@ -1,4 +1,4 @@
-name: Deploy FastAPI with Postgres
+name: Deploy FastAPI
 
 on:
   push:
