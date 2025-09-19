@@ -2,3 +2,9 @@ opencv-python
 fastapi
 numpy
 python-multipart
+uvicorn[standard]
+sqlalchemy[asyncio]
+asyncpg
+python-dotenv
+psycopg2-binary
+alembic

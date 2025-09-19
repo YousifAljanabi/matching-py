@@ -1,0 +1,21 @@
+name: Deploy FastAPI with Postgres
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Docker Compose
+        run: |
+          docker compose down || true
+          docker compose up -d --build
+
+#      - name: Run Alembic migrations
+#        run: docker compose exec fastapi alembic upgrade head
