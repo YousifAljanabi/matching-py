@@ -11,7 +11,7 @@ class Access(Base):
     room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
     from_hour = Column(Time, nullable=True)
     to_hour = Column(Time, nullable=True)
-    all_time_access = Column(Boolean, nullable=False, default=False)
+    all_time_access = Column(Boolean, nullable=True, default=False)
 
     user = relationship("User")
     room = relationship("Room")
