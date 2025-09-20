@@ -45,7 +45,7 @@ class CanUnlockResponse(BaseModel):
 
 
 @router.post("/", response_model=AccessResponse)
-async def create_access(access: AccessCreate, db: AsyncSession = Depends(get_db)):
+async def upsert_access(access: AccessCreate, db: AsyncSession = Depends(get_db)):
     # Check if user exists
     user_result = await db.execute(select(User).where(User.id == access.user_id))
     if not user_result.scalar_one_or_none():
@@ -56,26 +56,36 @@ async def create_access(access: AccessCreate, db: AsyncSession = Depends(get_db)
     if not room_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Room not found")
 
-    # Check if user already has access (only one row per user allowed)
-    existing_access = await db.execute(select(Access).where(Access.user_id == access.user_id))
-    if existing_access.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="User already has access configured. Update existing access instead.")
-
     # Validate time fields if not all_time_access
     if not access.all_time_access and (access.from_hour is None or access.to_hour is None):
         raise HTTPException(status_code=400, detail="from_hour and to_hour are required when all_time_access is False")
 
-    db_access = Access(
-        user_id=access.user_id,
-        room_id=access.room_id,
-        from_hour=access.from_hour,
-        to_hour=access.to_hour,
-        all_time_access=access.all_time_access
-    )
-    db.add(db_access)
-    await db.commit()
-    await db.refresh(db_access)
-    return db_access
+    # Check if user already has access (only one row per user allowed)
+    existing_access_result = await db.execute(select(Access).where(Access.user_id == access.user_id))
+    existing_access = existing_access_result.scalar_one_or_none()
+
+    if existing_access:
+        # Update existing access
+        existing_access.room_id = access.room_id
+        existing_access.from_hour = access.from_hour
+        existing_access.to_hour = access.to_hour
+        existing_access.all_time_access = access.all_time_access
+        await db.commit()
+        await db.refresh(existing_access)
+        return existing_access
+    else:
+        # Create new access
+        db_access = Access(
+            user_id=access.user_id,
+            room_id=access.room_id,
+            from_hour=access.from_hour,
+            to_hour=access.to_hour,
+            all_time_access=access.all_time_access
+        )
+        db.add(db_access)
+        await db.commit()
+        await db.refresh(db_access)
+        return db_access
 
 
 @router.get("/", response_model=List[AccessResponse])
