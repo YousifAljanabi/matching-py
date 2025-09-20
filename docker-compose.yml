@@ -9,7 +9,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5444:5444"
+      - "5431:5431"
 
   fastapi:
     build: .
@@ -17,8 +17,8 @@ services:
     depends_on:
       - db
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5444/fastapi_db
-      SYNC_DATABASE_URL: postgresql://postgres:postgres@db:5444/fastapi_db
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5431/fastapi_db
+      SYNC_DATABASE_URL: postgresql://postgres:postgres@db:5431/fastapi_db
 
     ports:
       - "8888:8888"
