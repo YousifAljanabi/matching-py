@@ -23,8 +23,8 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/homesec
-      SYNC_DATABASE_URL: postgresql://postgres:postgres@db:5432/homesec
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/fastapi_db
+      SYNC_DATABASE_URL: postgresql://postgres:postgres@db:5432/fastapi_db
     ports:
       - "8888:8888"
     restart: always
