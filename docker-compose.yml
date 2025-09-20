@@ -4,8 +4,8 @@ services:
     container_name: home_security_db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: y1977
-      POSTGRES_DB: homesec
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fastapi_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -23,8 +23,8 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:y1977@db:5432/homesec
-      SYNC_DATABASE_URL: postgresql://postgres:y1977@db:5432/homesec
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/homesec
+      SYNC_DATABASE_URL: postgresql://postgres:postgres@db:5432/homesec
     ports:
       - "8888:8888"
     restart: always
