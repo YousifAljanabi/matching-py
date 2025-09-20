@@ -1,6 +1,4 @@
-opencv-python
 fastapi
-numpy
 python-multipart
 uvicorn[standard]
 sqlalchemy[asyncio]

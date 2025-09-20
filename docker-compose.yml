@@ -1,24 +1,24 @@
 services:
-#  db:
-#    image: postgres:15
-#    container_name: fastapi_db
-#    environment:
-#      POSTGRES_USER: postgres
-#      POSTGRES_PASSWORD: postgres
-#      POSTGRES_DB: fastapi_db
-#    volumes:
-#      - postgres_data:/var/lib/postgresql/data
-#    ports:
-#      - "5452:5432"
+  db:
+    image: postgres:15
+    container_name: home_security_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fastapi_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5452:5452"
 
   fastapi:
     build: .
     container_name: matching_api
-#    depends_on:
-#      - db
-#    environment:
-#      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/fastapi_db
-#      SYNC_DATABASE_URL: postgresql://postgres:postgres@db:5432/fastapi_db
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5452/fastapi_db
+      SYNC_DATABASE_URL: postgresql://postgres:postgres@db:5452/fastapi_db
 
     ports:
       - "8888:8888"
