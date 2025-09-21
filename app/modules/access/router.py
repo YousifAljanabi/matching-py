@@ -30,7 +30,9 @@ class AccessUpdate(BaseModel):
 class AccessResponse(BaseModel):
     id: int
     user_id: int
+    user_name: str
     room_id: int
+    room_name: str
     from_hour: Optional[time]
     to_hour: Optional[time]
     all_time_access: bool
@@ -68,6 +70,10 @@ async def upsert_access(access: AccessCreate, db: AsyncSession = Depends(get_db)
     existing_access_result = await db.execute(select(Access).where(Access.user_id == user.id))
     existing_access = existing_access_result.scalar_one_or_none()
 
+    # Get room details for response
+    room_result = await db.execute(select(Room).where(Room.id == access.room_id))
+    room = room_result.scalar_one()
+
     if existing_access:
         # Update existing access
         existing_access.room_id = access.room_id
@@ -76,7 +82,17 @@ async def upsert_access(access: AccessCreate, db: AsyncSession = Depends(get_db)
         existing_access.all_time_access = access.all_time_access
         await db.commit()
         await db.refresh(existing_access)
-        return existing_access
+
+        return AccessResponse(
+            id=existing_access.id,
+            user_id=existing_access.user_id,
+            user_name=user.name,
+            room_id=existing_access.room_id,
+            room_name=room.name,
+            from_hour=existing_access.from_hour,
+            to_hour=existing_access.to_hour,
+            all_time_access=existing_access.all_time_access
+        )
     else:
         # Create new access
         db_access = Access(
@@ -89,32 +105,75 @@ async def upsert_access(access: AccessCreate, db: AsyncSession = Depends(get_db)
         db.add(db_access)
         await db.commit()
         await db.refresh(db_access)
-        return db_access
+
+        return AccessResponse(
+            id=db_access.id,
+            user_id=db_access.user_id,
+            user_name=user.name,
+            room_id=db_access.room_id,
+            room_name=room.name,
+            from_hour=db_access.from_hour,
+            to_hour=db_access.to_hour,
+            all_time_access=db_access.all_time_access
+        )
 
 
 @router.get("/", response_model=List[AccessResponse])
 async def get_access_list(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Access))
-    access_list = result.scalars().all()
+    result = await db.execute(select(Access, User, Room).join(User).join(Room))
+    access_list = []
+    for access, user, room in result.all():
+        access_list.append(AccessResponse(
+            id=access.id,
+            user_id=access.user_id,
+            user_name=user.name,
+            room_id=access.room_id,
+            room_name=room.name,
+            from_hour=access.from_hour,
+            to_hour=access.to_hour,
+            all_time_access=access.all_time_access
+        ))
     return access_list
 
 
 @router.get("/{access_id}", response_model=AccessResponse)
 async def get_access(access_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Access).where(Access.id == access_id))
-    access = result.scalar_one_or_none()
-    if not access:
+    result = await db.execute(select(Access, User, Room).join(User).join(Room).where(Access.id == access_id))
+    access_data = result.first()
+    if not access_data:
         raise HTTPException(status_code=404, detail="Access not found")
-    return access
+
+    access, user, room = access_data
+    return AccessResponse(
+        id=access.id,
+        user_id=access.user_id,
+        user_name=user.name,
+        room_id=access.room_id,
+        room_name=room.name,
+        from_hour=access.from_hour,
+        to_hour=access.to_hour,
+        all_time_access=access.all_time_access
+    )
 
 
 @router.get("/user/{user_id}", response_model=AccessResponse)
 async def get_user_access(user_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Access).where(Access.user_id == user_id))
-    access = result.scalar_one_or_none()
-    if not access:
+    result = await db.execute(select(Access, User, Room).join(User).join(Room).where(Access.user_id == user_id))
+    access_data = result.first()
+    if not access_data:
         raise HTTPException(status_code=404, detail="Access not found for this user")
-    return access
+
+    access, user, room = access_data
+    return AccessResponse(
+        id=access.id,
+        user_id=access.user_id,
+        user_name=user.name,
+        room_id=access.room_id,
+        room_name=room.name,
+        from_hour=access.from_hour,
+        to_hour=access.to_hour,
+        all_time_access=access.all_time_access
+    )
 
 
 @router.put("/user/{user_id}", response_model=AccessResponse)
@@ -139,7 +198,23 @@ async def update_user_access(user_id: int, access_update: AccessUpdate, db: Asyn
     access.all_time_access = access_update.all_time_access
     await db.commit()
     await db.refresh(access)
-    return access
+
+    # Get user and room details for response
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one()
+    room_result = await db.execute(select(Room).where(Room.id == access.room_id))
+    room = room_result.scalar_one()
+
+    return AccessResponse(
+        id=access.id,
+        user_id=access.user_id,
+        user_name=user.name,
+        room_id=access.room_id,
+        room_name=room.name,
+        from_hour=access.from_hour,
+        to_hour=access.to_hour,
+        all_time_access=access.all_time_access
+    )
 
 
 @router.delete("/user/{user_id}")
@@ -154,8 +229,8 @@ async def delete_user_access(user_id: int, db: AsyncSession = Depends(get_db)):
     return {"message": "Access deleted successfully"}
 
 
-@router.get("/check-access/{user_id}/{room_id}", response_model=CanAccessResponse)
-async def check_can_access(user_id: int, room_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/check-access/{user_name}/{room_id}", response_model=CanAccessResponse)
+async def check_can_access(user_name: str, room_id: int, db: AsyncSession = Depends(get_db)):
     # Get the room to check if it's locked
     room_result = await db.execute(select(Room).where(Room.id == room_id))
     room = room_result.scalar_one_or_none()
@@ -173,10 +248,20 @@ async def check_can_access(user_id: int, room_id: int, db: AsyncSession = Depend
             message="Room is locked"
         )
 
+    # Get user by name first
+    user_result = await db.execute(select(User).where(User.name == user_name))
+    user = user_result.scalar_one_or_none()
+
+    if not user:
+        return CanAccessResponse(
+            can_access=False,
+            message="User not found"
+        )
+
     # Room is unlocked, now check user access permissions
     access_result = await db.execute(
         select(Access).where(
-            and_(Access.user_id == user_id, Access.room_id == room_id)
+            and_(Access.user_id == user.id, Access.room_id == room_id)
         )
     )
     access = access_result.scalar_one_or_none()
