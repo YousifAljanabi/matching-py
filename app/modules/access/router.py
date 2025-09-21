@@ -6,7 +6,7 @@ from datetime import time, datetime
 from app.core.database import get_db
 from app.modules.access.models import Access
 from app.modules.users.models import User
-from app.modules.room.models import Room
+from app.modules.room.models import Room, RoomState
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/access", tags=["access"])
@@ -39,8 +39,8 @@ class AccessResponse(BaseModel):
         from_attributes = True
 
 
-class CanUnlockResponse(BaseModel):
-    can_unlock: bool
+class CanAccessResponse(BaseModel):
+    can_access: bool
     message: str
 
 
@@ -150,33 +150,50 @@ async def delete_user_access(user_id: int, db: AsyncSession = Depends(get_db)):
     return {"message": "Access deleted successfully"}
 
 
-@router.get("/check-unlock/{user_id}/{room_id}", response_model=CanUnlockResponse)
-async def check_can_unlock(user_id: int, room_id: int, db: AsyncSession = Depends(get_db)):
-    # Get user access for the specific room
-    result = await db.execute(
+@router.get("/check-access/{user_id}/{room_id}", response_model=CanAccessResponse)
+async def check_can_access(user_id: int, room_id: int, db: AsyncSession = Depends(get_db)):
+    # Get the room to check if it's locked
+    room_result = await db.execute(select(Room).where(Room.id == room_id))
+    room = room_result.scalar_one_or_none()
+
+    if not room:
+        return CanAccessResponse(
+            can_access=False,
+            message="Room not found"
+        )
+
+    # If room is locked, deny access completely
+    if room.state == RoomState.LOCKED:
+        return CanAccessResponse(
+            can_access=False,
+            message="Room is locked"
+        )
+
+    # Room is unlocked, now check user access permissions
+    access_result = await db.execute(
         select(Access).where(
             and_(Access.user_id == user_id, Access.room_id == room_id)
         )
     )
-    access = result.scalar_one_or_none()
+    access = access_result.scalar_one_or_none()
 
     if not access:
-        return CanUnlockResponse(
-            can_unlock=False,
+        return CanAccessResponse(
+            can_access=False,
             message="User does not have access to this room"
         )
 
-    # If user has all_time_access, they can always unlock
+    # If user has all_time_access, they can access when room is unlocked
     if access.all_time_access:
-        return CanUnlockResponse(
-            can_unlock=True,
+        return CanAccessResponse(
+            can_access=True,
             message="User has all-time access to this room"
         )
 
     # Check time-based access
     if access.from_hour is None or access.to_hour is None:
-        return CanUnlockResponse(
-            can_unlock=False,
+        return CanAccessResponse(
+            can_access=False,
             message="Access time configuration is invalid"
         )
 
@@ -186,18 +203,18 @@ async def check_can_unlock(user_id: int, room_id: int, db: AsyncSession = Depend
     # Handle time range that crosses midnight
     if access.from_hour <= access.to_hour:
         # Normal range (e.g., 9:00 to 17:00)
-        can_unlock = access.from_hour <= current_time <= access.to_hour
+        can_access = access.from_hour <= current_time <= access.to_hour
     else:
         # Range crosses midnight (e.g., 22:00 to 06:00)
-        can_unlock = current_time >= access.from_hour or current_time <= access.to_hour
+        can_access = current_time >= access.from_hour or current_time <= access.to_hour
 
-    if can_unlock:
-        return CanUnlockResponse(
-            can_unlock=True,
-            message=f"User can unlock room from {access.from_hour} to {access.to_hour}"
+    if can_access:
+        return CanAccessResponse(
+            can_access=True,
+            message=f"User can access room from {access.from_hour} to {access.to_hour}"
         )
     else:
-        return CanUnlockResponse(
-            can_unlock=False,
+        return CanAccessResponse(
+            can_access=False,
             message=f"Current time {current_time} is outside allowed access hours ({access.from_hour} to {access.to_hour})"
         )
