@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, ForeignKey, DateTime, String
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -10,6 +10,7 @@ class Log(Base):
     datetime = Column(DateTime, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    access_type = Column(String, nullable=False)
 
     user = relationship("User")
     room = relationship("Room")

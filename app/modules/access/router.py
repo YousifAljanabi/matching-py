@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.modules.access.models import Access
 from app.modules.users.models import User
 from app.modules.room.models import Room, RoomState
+from app.modules.log.models import Log
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/access", tags=["access"])
@@ -238,14 +239,29 @@ async def check_can_access(user_name: str, room_id: int, db: AsyncSession = Depe
     if not room:
         return CanAccessResponse(
             can_access=False,
-            message="Room not found"
+            message="Room not found",
         )
 
     # If room is locked, deny access completely
     if room.state == RoomState.LOCKED:
+        # Get user for logging
+        user_result = await db.execute(select(User).where(User.name == user_name))
+        user = user_result.scalar_one_or_none()
+
+        if user:
+            # Log declined access
+            log_entry = Log(
+                datetime=datetime.now(),
+                user_id=user.id,
+                room_id=room_id,
+                access_type="declined"
+            )
+            db.add(log_entry)
+            await db.commit()
+
         return CanAccessResponse(
             can_access=False,
-            message="Room is locked"
+            message="Room is locked",
         )
 
     # Get user by name first
@@ -255,7 +271,7 @@ async def check_can_access(user_name: str, room_id: int, db: AsyncSession = Depe
     if not user:
         return CanAccessResponse(
             can_access=False,
-            message="User not found"
+            message="User not found",
         )
 
     # Room is unlocked, now check user access permissions
@@ -267,23 +283,52 @@ async def check_can_access(user_name: str, room_id: int, db: AsyncSession = Depe
     access = access_result.scalar_one_or_none()
 
     if not access:
+        log_entry = Log(
+            datetime=datetime.now(),
+            user_id=user.id,
+            room_id=room_id,
+            access_type="declined"
+        )
+        db.add(log_entry)
+        await db.commit()
+
         return CanAccessResponse(
             can_access=False,
-            message="User does not have access to this room"
+            message="User does not have access to this room",
         )
 
     # If user has all_time_access, they can access when room is unlocked
     if access.all_time_access:
+        # Log granted access
+        log_entry = Log(
+            datetime=datetime.now(),
+            user_id=user.id,
+            room_id=room_id,
+            access_type="granted"
+        )
+        db.add(log_entry)
+        await db.commit()
+
         return CanAccessResponse(
             can_access=True,
-            message="User has all-time access to this room"
+            message="User has all-time access to this room",
         )
 
     # Check time-based access
     if access.from_hour is None or access.to_hour is None:
+        # Log declined access
+        log_entry = Log(
+            datetime=datetime.now(),
+            user_id=user.id,
+            room_id=room_id,
+            access_type="declined"
+        )
+        db.add(log_entry)
+        await db.commit()
+
         return CanAccessResponse(
             can_access=False,
-            message="Access time configuration is invalid"
+            message="Access time configuration is invalid",
         )
 
     # Check current time
@@ -297,13 +342,24 @@ async def check_can_access(user_name: str, room_id: int, db: AsyncSession = Depe
         # Range crosses midnight (e.g., 22:00 to 06:00)
         can_access = current_time >= access.from_hour or current_time <= access.to_hour
 
+    # Log the access attempt
+    access_type = "granted" if can_access else "declined"
+    log_entry = Log(
+        datetime=datetime.now(),
+        user_id=user.id,
+        room_id=room_id,
+        access_type=access_type
+    )
+    db.add(log_entry)
+    await db.commit()
+
     if can_access:
         return CanAccessResponse(
             can_access=True,
-            message=f"User can access room from {access.from_hour} to {access.to_hour}"
+            message=f"User can access room from {access.from_hour} to {access.to_hour}",
         )
     else:
         return CanAccessResponse(
             can_access=False,
-            message=f"Current time {current_time} is outside allowed access hours ({access.from_hour} to {access.to_hour})"
+            message=f"Current time {current_time} is outside allowed access hours ({access.from_hour} to {access.to_hour})",
         )

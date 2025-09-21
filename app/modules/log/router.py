@@ -17,6 +17,7 @@ class LogCreate(BaseModel):
     datetime: datetime
     user_id: int
     room_id: int
+    access_type: str
 
 
 class LogResponse(BaseModel):
@@ -24,6 +25,7 @@ class LogResponse(BaseModel):
     datetime: datetime
     user_id: int
     room_id: int
+    access_type: str
 
     class Config:
         from_attributes = True
@@ -36,6 +38,7 @@ class LogDetailResponse(BaseModel):
     user_name: str
     room_id: int
     room_name: str
+    access_type: str
 
     class Config:
         from_attributes = True
@@ -56,7 +59,8 @@ async def create_log(log: LogCreate, db: AsyncSession = Depends(get_db)):
     db_log = Log(
         datetime=log.datetime,
         user_id=log.user_id,
-        room_id=log.room_id
+        room_id=log.room_id,
+        access_type=log.access_type
     )
     db.add(db_log)
     await db.commit()
@@ -81,7 +85,8 @@ async def get_all_logs(db: AsyncSession = Depends(get_db)):
             user_id=log.user_id,
             user_name=user_name,
             room_id=log.room_id,
-            room_name=room_name
+            room_name=room_name,
+            access_type=log.access_type
         ))
 
     return logs
@@ -111,7 +116,8 @@ async def get_logs_by_room_id(room_id: int, db: AsyncSession = Depends(get_db)):
             user_id=log.user_id,
             user_name=user_name,
             room_id=log.room_id,
-            room_name=room_name
+            room_name=room_name,
+            access_type=log.access_type
         ))
 
     return logs
@@ -141,7 +147,8 @@ async def get_logs_by_room_name(room_name: str, db: AsyncSession = Depends(get_d
             user_id=log.user_id,
             user_name=user_name,
             room_id=log.room_id,
-            room_name=room_name
+            room_name=room_name,
+            access_type=log.access_type
         ))
 
     return logs
@@ -167,5 +174,6 @@ async def get_log(log_id: int, db: AsyncSession = Depends(get_db)):
         user_id=log.user_id,
         user_name=user_name,
         room_id=log.room_id,
-        room_name=room_name
+        room_name=room_name,
+        access_type=log.access_type
     )
