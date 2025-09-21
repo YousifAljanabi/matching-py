@@ -18,7 +18,7 @@ services:
 
   fastapi:
     build: .
-    container_name: matching_api
+    container_name: homesec
     depends_on:
       db:
         condition: service_healthy
