@@ -7,10 +7,10 @@ from skimage.filters import threshold_sauvola
 from PIL import Image
 from fastapi import APIRouter, File, UploadFile, HTTPException
 
-from .utils.normalization import normalize as iitk_normalize
-from .utils.segmentation import create_segmented_and_variance_images
-from .utils.orientation import calculate_angles
-from .utils.frequency import ridge_freq
+from app.modules.normalize_phone.utils.normalization import normalize as iitk_normalize
+from app.modules.normalize_phone.utils.segmentation import create_segmented_and_variance_images
+from app.modules.normalize_phone.utils.orientation import calculate_angles
+from app.modules.normalize_phone.utils.frequency import ridge_freq
 from .utils.gabor_filter import gabor_filter
 
 # -------------------------
