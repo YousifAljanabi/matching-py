@@ -13,7 +13,7 @@ router = APIRouter(prefix="/access", tags=["access"])
 
 
 class AccessCreate(BaseModel):
-    user_id: int
+    user_name: str
     room_id: int
     from_hour: Optional[time] = None
     to_hour: Optional[time] = None
@@ -46,10 +46,14 @@ class CanAccessResponse(BaseModel):
 
 @router.post("/", response_model=AccessResponse)
 async def upsert_access(access: AccessCreate, db: AsyncSession = Depends(get_db)):
-    # Check if user exists
-    user_result = await db.execute(select(User).where(User.id == access.user_id))
-    if not user_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="User not found")
+    user_result = await db.execute(select(User).where(User.name == access.user_name))
+    user = user_result.scalar_one_or_none()
+
+    if not user:
+        user = User(name=access.user_name)
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
 
     # Check if room exists
     room_result = await db.execute(select(Room).where(Room.id == access.room_id))
@@ -61,7 +65,7 @@ async def upsert_access(access: AccessCreate, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=400, detail="from_hour and to_hour are required when all_time_access is False")
 
     # Check if user already has access (only one row per user allowed)
-    existing_access_result = await db.execute(select(Access).where(Access.user_id == access.user_id))
+    existing_access_result = await db.execute(select(Access).where(Access.user_id == user.id))
     existing_access = existing_access_result.scalar_one_or_none()
 
     if existing_access:
@@ -76,7 +80,7 @@ async def upsert_access(access: AccessCreate, db: AsyncSession = Depends(get_db)
     else:
         # Create new access
         db_access = Access(
-            user_id=access.user_id,
+            user_id=user.id,
             room_id=access.room_id,
             from_hour=access.from_hour,
             to_hour=access.to_hour,
